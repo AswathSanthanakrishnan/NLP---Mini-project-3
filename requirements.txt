@@ -1,4 +1,6 @@
 streamlit
 pandas
 sentence-transformers
-huggingface_hub
+transformers
+torch
+accelerate

@@ -2,24 +2,17 @@
 import streamlit as st
 import pandas as pd
 from sentence_transformers import SentenceTransformer, util
-from huggingface_hub import InferenceClient
+from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 import numpy as np
+import torch
 
 # --- Configuration ---
 st.set_page_config(page_title="tasker.ai", layout="wide")
 
-# ==============================================================================
-# IMPORTANT: MANUAL STEP REQUIRED
-# ==============================================================================
-# To make the AI features work, you MUST replace the placeholder text below
-# with your actual Hugging Face API key.
-#
-# 1. Get your API key from Hugging Face: https://huggingface.co/settings/tokens
-# 2. Replace "YOUR_HUGGING_FACE_API_KEY_GOES_HERE" with your key.
-#
-# The app will NOT work until you do this.
-# ==============================================================================
-HF_API_KEY = "YOUR_HUGGING_FACE_API_KEY_GOES_HERE"
+# Initialize model cache in session state
+if "text_generator" not in st.session_state:
+    st.session_state["text_generator"] = None
+    st.session_state["model_loaded"] = False
 
 
 # --- Main App ---
@@ -124,41 +117,189 @@ def main():
             st.warning("Please upload an employee CSV file in the sidebar.")
 
 
-def generate_from_huggingface(prompt):
-    if not HF_API_KEY or HF_API_KEY == "YOUR_HUGGING_FACE_API_KEY_GOES_HERE":
-        st.error(
-            "Please replace 'YOUR_HUGGING_FACE_API_KEY_GOES_HERE' in the app.py file with your actual Hugging Face API key."
+@st.cache_resource
+def load_text_generator():
+    """Load the text generation model (cached to avoid reloading)"""
+    try:
+        # Using distilgpt2 - smaller and faster than gpt2, good for basic text generation
+        model_name = "distilgpt2"
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+        
+        # Set pad token if not present
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        
+        generator = pipeline(
+            "text-generation",
+            model=model,
+            tokenizer=tokenizer,
+            device=-1 if not torch.cuda.is_available() else 0,  # Use CPU if no GPU
         )
+        return generator
+    except Exception as e:
+        st.error(f"Error loading model: {e}")
         return None
 
+def generate_from_model(prompt):
+    """Generate text using local model"""
     try:
-        client = InferenceClient(token=HF_API_KEY)
-        messages = [{"role": "user", "content": prompt}]
-        response = client.chat_completion(
-            messages=messages,
-            model="mistralai/Mistral-7B-Instruct-v0.2",
-            max_tokens=1024,
+        # Load model if not already loaded
+        if st.session_state["text_generator"] is None:
+            with st.spinner("Loading AI model (first time only, this may take a moment)..."):
+                generator = load_text_generator()
+                if generator is None:
+                    return None
+                st.session_state["text_generator"] = generator
+                st.session_state["model_loaded"] = True
+        
+        generator = st.session_state["text_generator"]
+        
+        # Format prompt for better generation
+        formatted_prompt = prompt + "\n\n"
+        
+        # Generate text
+        results = generator(
+            formatted_prompt,
+            max_length=len(formatted_prompt.split()) + 300,  # Generate additional tokens
+            num_return_sequences=1,
+            temperature=0.7,
+            do_sample=True,
+            pad_token_id=generator.tokenizer.eos_token_id,
         )
-        return response.choices[0].message.content
+        
+        generated_text = results[0]["generated_text"]
+        
+        # Remove the original prompt from the generated text
+        if generated_text.startswith(formatted_prompt):
+            generated_text = generated_text[len(formatted_prompt):].strip()
+        
+        return generated_text
     except Exception as e:
-        st.error(f"Error generating text from Hugging Face: {e}")
+        st.error(f"Error generating text: {e}")
         return None
 
 
 def generate_prd(project_name, project_description):
     st.info("Generating PRD...")
-    prompt = f"Generate a Product Requirements Document (PRD) for a project named '{project_name}' with the description: '{project_description}'. The PRD should include sections for Overview, Core Features, and Technical Architecture."
-    prd = generate_from_huggingface(prompt)
-    if prd:
-        st.session_state["prd"] = prd
+    # Create a structured PRD based on the project description
+    # Since GPT-2 is not instruction-tuned, we'll create a template-based PRD
+    # that incorporates the project description intelligently
+    
+    # Generate some features based on the description
+    prompt = f"Features for {project_name}: {project_description[:100]}"
+    features_text = generate_from_model(prompt)
+    
+    # Create a well-structured PRD
+    features_list = []
+    if features_text:
+        # Extract potential features from generated text
+        sentences = features_text.split('.')
+        for sent in sentences[:5]:  # Take first 5 sentences as features
+            sent = sent.strip()
+            if len(sent) > 10:
+                features_list.append(f"- {sent}")
+    
+    # If no features generated, create default ones based on keywords
+    if not features_list:
+        keywords = project_description.lower()
+        if 'chatbot' in keywords or 'ai' in keywords:
+            features_list = [
+                "- Natural language processing capabilities",
+                "- User-friendly conversational interface",
+                "- Integration with knowledge base",
+                "- Multi-channel support"
+            ]
+        elif 'e-commerce' in keywords or 'website' in keywords:
+            features_list = [
+                "- Responsive design for all devices",
+                "- Secure payment processing",
+                "- Product catalog management",
+                "- Shopping cart functionality"
+            ]
+        elif 'mobile' in keywords or 'app' in keywords:
+            features_list = [
+                "- Cross-platform compatibility",
+                "- Offline functionality",
+                "- Push notifications",
+                "- User authentication"
+            ]
+        else:
+            features_list = [
+                "- User-friendly interface",
+                "- Core functionality implementation",
+                "- Data management system",
+                "- Security and authentication"
+            ]
+    
+    full_prd = f"""# Product Requirements Document: {project_name}
+
+## Overview
+{project_description}
+
+## Core Features
+{chr(10).join(features_list)}
+
+## Technical Architecture
+- Frontend: Modern web/mobile framework
+- Backend: Scalable API architecture
+- Database: Relational or NoSQL database as needed
+- Deployment: Cloud-based infrastructure
+- Security: Authentication and authorization mechanisms
+
+## Success Metrics
+- User engagement and satisfaction
+- Performance benchmarks
+- Scalability requirements
+"""
+    st.session_state["prd"] = full_prd
 
 def generate_tasks_from_prd(prd_input):
     st.info("Generating tasks...")
-    prompt = f"Generate a list of tasks from the following PRD. Provide the tasks as a numbered list.\n\n{prd_input}"
-    tasks_text = generate_from_huggingface(prompt)
-    if tasks_text:
-        tasks = tasks_text.strip().split("\n")
-        st.session_state["tasks"] = tasks
+    
+    # Extract key information from PRD
+    prd_lower = prd_input.lower()
+    
+    # Generate tasks based on PRD content
+    # Create a smart task list based on common project phases and PRD content
+    tasks = []
+    
+    # Phase 1: Planning and Design
+    tasks.append("Review and analyze PRD requirements")
+    tasks.append("Create technical design document")
+    tasks.append("Set up development environment")
+    
+    # Phase 2: Core Development (based on PRD content)
+    if 'frontend' in prd_lower or 'ui' in prd_lower or 'interface' in prd_lower:
+        tasks.append("Design and implement user interface")
+    if 'backend' in prd_lower or 'api' in prd_lower:
+        tasks.append("Develop backend API endpoints")
+    if 'database' in prd_lower or 'data' in prd_lower:
+        tasks.append("Design and implement database schema")
+    if 'authentication' in prd_lower or 'security' in prd_lower:
+        tasks.append("Implement authentication and security features")
+    
+    # Phase 3: Features (extract from PRD)
+    if 'feature' in prd_input:
+        # Try to extract feature names
+        lines = prd_input.split('\n')
+        for line in lines:
+            if '- ' in line and 'feature' in line.lower():
+                feature = line.split('- ', 1)[1].strip()
+                if len(feature) < 100:  # Reasonable length
+                    tasks.append(f"Implement {feature}")
+    
+    # Phase 4: Testing and Deployment
+    tasks.append("Write unit tests and integration tests")
+    tasks.append("Perform code review and quality assurance")
+    tasks.append("Deploy application to staging environment")
+    tasks.append("Perform user acceptance testing")
+    tasks.append("Deploy to production and monitor")
+    
+    # Limit to reasonable number of tasks
+    tasks = tasks[:15]
+    
+    st.session_state["tasks"] = tasks
 
 def assign_tasks(tasks, employees_df):
     st.info("Assigning tasks...")
