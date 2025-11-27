@@ -304,13 +304,48 @@ def generate_prd(project_name, project_description):
                     "Secure payment gateway integration",
                     "Order management and tracking system"
                 ]
-            elif 'mobile' in desc_lower or 'app' in desc_lower:
+            elif 'ios' in desc_lower or 'iphone' in desc_lower or 'ipad' in desc_lower:
                 features_list = [
-                    "Cross-platform mobile application (iOS/Android)",
-                    "Offline functionality and data synchronization",
-                    "Push notifications for updates and reminders",
-                    "User authentication and profile management"
+                    "Native iOS application with Swift/SwiftUI",
+                    "iOS Human Interface Guidelines compliance",
+                    "App Store integration and submission",
+                    "Core Data or CloudKit for data persistence",
+                    "Push notifications via APNs"
                 ]
+            elif 'android' in desc_lower and ('ios' not in desc_lower and 'iphone' not in desc_lower):
+                features_list = [
+                    "Native Android application with Kotlin/Java",
+                    "Material Design guidelines compliance",
+                    "Google Play Store integration",
+                    "Room or SQLite for local database",
+                    "Firebase Cloud Messaging for push notifications"
+                ]
+            elif 'mobile' in desc_lower or 'app' in desc_lower:
+                # Check if it's cross-platform or native
+                if 'native' in desc_lower or 'swift' in desc_lower or 'kotlin' in desc_lower:
+                    # Native development
+                    if 'ios' in desc_lower or 'iphone' in desc_lower:
+                        features_list = [
+                            "Native iOS application with Swift/SwiftUI",
+                            "iOS Human Interface Guidelines compliance",
+                            "App Store integration",
+                            "Core Data for local storage"
+                        ]
+                    else:
+                        features_list = [
+                            "Native mobile application",
+                            "Platform-specific UI/UX",
+                            "App store integration",
+                            "Local data persistence"
+                        ]
+                else:
+                    # Cross-platform
+                    features_list = [
+                        "Cross-platform mobile application (iOS/Android)",
+                        "Offline functionality and data synchronization",
+                        "Push notifications for updates and reminders",
+                        "User authentication and profile management"
+                    ]
             else:
                 features_list = [
                     "User-friendly and intuitive interface",
@@ -324,15 +359,62 @@ def generate_prd(project_name, project_description):
         if tools_text:
             tools_list = extract_bullet_points(tools_text, max_items=8)
         
-        # Intelligent tool detection based on project type
+        # Intelligent tool detection based on project type - CHECK iOS/Android FIRST
         if not tools_list:
-            if 'mobile' in desc_lower or 'app' in desc_lower:
+            # iOS Native Development
+            if 'ios' in desc_lower or 'iphone' in desc_lower or 'ipad' in desc_lower or ('native' in desc_lower and 'ios' in project_name.lower()):
+                tools_list = [
+                    "Xcode - Apple's integrated development environment (IDE)",
+                    "Swift programming language for iOS development",
+                    "SwiftUI or UIKit for user interface development",
+                    "Core Data or CloudKit for data persistence",
+                    "CocoaPods or Swift Package Manager for dependency management",
+                    "TestFlight for beta testing",
+                    "App Store Connect for app distribution"
+                ]
+            # Android Native Development
+            elif 'android' in desc_lower and ('ios' not in desc_lower and 'iphone' not in desc_lower) or ('native' in desc_lower and 'android' in project_name.lower()):
+                tools_list = [
+                    "Android Studio - Official Android IDE",
+                    "Kotlin or Java programming language",
+                    "Jetpack Compose or XML layouts for UI",
+                    "Room or SQLite for local database",
+                    "Gradle for build automation and dependency management",
+                    "Google Play Console for app distribution",
+                    "Firebase for backend services (optional)"
+                ]
+            # Cross-platform Mobile (React Native/Flutter)
+            elif ('react native' in desc_lower or 'flutter' in desc_lower or 'cross-platform' in desc_lower) and ('native' not in desc_lower):
                 tools_list = [
                     "React Native or Flutter for cross-platform development",
                     "Firebase or AWS for backend services",
                     "SQLite or Realm for local database",
                     "RESTful API for server communication"
                 ]
+            # Generic Mobile App (assume cross-platform if not specified)
+            elif 'mobile' in desc_lower or 'app' in desc_lower:
+                # Check for native keywords
+                if 'native' in desc_lower or 'swift' in desc_lower or 'xcode' in desc_lower:
+                    tools_list = [
+                        "Xcode and Swift for iOS development",
+                        "SwiftUI or UIKit framework",
+                        "Core Data for local storage",
+                        "App Store Connect for distribution"
+                    ]
+                elif 'kotlin' in desc_lower or 'android studio' in desc_lower:
+                    tools_list = [
+                        "Android Studio and Kotlin for Android development",
+                        "Jetpack Compose or XML layouts",
+                        "Room database for local storage",
+                        "Google Play Console for distribution"
+                    ]
+                else:
+                    tools_list = [
+                        "React Native or Flutter for cross-platform development",
+                        "Firebase or AWS for backend services",
+                        "SQLite or Realm for local database",
+                        "RESTful API for server communication"
+                    ]
             elif 'web' in desc_lower or 'website' in desc_lower:
                 tools_list = [
                     "React.js or Vue.js for frontend framework",
@@ -401,11 +483,36 @@ def generate_tasks_from_prd(prd_input):
         
         tasks = []
         prd_lower = prd_input.lower()
+        project_name_lower = prd_lower.split('product requirements document:')[1].split('\n')[0].strip().lower() if 'product requirements document:' in prd_lower else ""
+        
+        # Detect platform type
+        is_ios = 'ios' in prd_lower or 'iphone' in prd_lower or 'ipad' in prd_lower or 'xcode' in prd_lower or 'swift' in prd_lower or 'ios' in project_name_lower
+        is_android = ('android' in prd_lower or 'kotlin' in prd_lower or 'android studio' in prd_lower) and not is_ios
+        is_native_mobile = is_ios or is_android
+        is_cross_platform = ('react native' in prd_lower or 'flutter' in prd_lower or 'cross-platform' in prd_lower) and not is_native_mobile
         
         # Phase 1: Planning and Setup
         tasks.append("Review and analyze PRD requirements thoroughly")
         tasks.append("Create detailed technical design document")
-        tasks.append("Set up development environment and tools")
+        
+        # Platform-specific setup tasks
+        if is_ios:
+            tasks.append("Install and configure Xcode development environment")
+            tasks.append("Set up Apple Developer account and certificates")
+            tasks.append("Create new Xcode project with Swift/SwiftUI")
+            tasks.append("Configure project settings (bundle ID, version, etc.)")
+        elif is_android:
+            tasks.append("Install and configure Android Studio")
+            tasks.append("Set up Android SDK and required tools")
+            tasks.append("Create new Android project with Kotlin/Java")
+            tasks.append("Configure app manifest and build.gradle")
+        elif is_cross_platform:
+            tasks.append("Set up React Native or Flutter development environment")
+            tasks.append("Initialize cross-platform project structure")
+            tasks.append("Configure platform-specific settings")
+        else:
+            tasks.append("Set up development environment and tools")
+        
         tasks.append("Initialize project repository and version control")
         
         # Extract features from PRD and create tasks
@@ -435,13 +542,34 @@ def generate_tasks_from_prd(prd_input):
             if tools_section and '- ' in line:
                 tool = line.split('- ', 1)[1].strip()
                 if len(tool) > 5:
+                    # Skip generic setup if it's iOS/Android specific
+                    if is_ios and 'xcode' in tool.lower():
+                        continue  # Already added above
+                    if is_android and 'android studio' in tool.lower():
+                        continue  # Already added above
                     tasks.append(f"Set up and configure {tool}")
         
-        # Core development tasks based on PRD content
-        if 'frontend' in prd_lower or 'ui' in prd_lower or 'interface' in prd_lower:
-            tasks.append("Design user interface mockups and wireframes")
-            tasks.append("Implement responsive frontend components")
-            tasks.append("Integrate frontend with backend APIs")
+        # Platform-specific development tasks
+        if is_ios:
+            tasks.append("Design iOS UI/UX following Human Interface Guidelines")
+            tasks.append("Implement SwiftUI views or UIKit components")
+            tasks.append("Set up Core Data or CloudKit for data persistence")
+            tasks.append("Configure App Store Connect and app metadata")
+            tasks.append("Implement push notifications using APNs")
+            tasks.append("Add app icons and launch screens for all device sizes")
+        elif is_android:
+            tasks.append("Design Android UI/UX following Material Design guidelines")
+            tasks.append("Implement Jetpack Compose or XML layouts")
+            tasks.append("Set up Room database or SQLite for local storage")
+            tasks.append("Configure Google Play Console and app listing")
+            tasks.append("Implement Firebase Cloud Messaging for push notifications")
+            tasks.append("Add app icons and adaptive icons for different densities")
+        else:
+            # Core development tasks based on PRD content (web/cross-platform)
+            if 'frontend' in prd_lower or 'ui' in prd_lower or 'interface' in prd_lower:
+                tasks.append("Design user interface mockups and wireframes")
+                tasks.append("Implement responsive frontend components")
+                tasks.append("Integrate frontend with backend APIs")
         
         if 'backend' in prd_lower or 'api' in prd_lower:
             tasks.append("Design and develop RESTful API endpoints")
@@ -474,15 +602,28 @@ def generate_tasks_from_prd(prd_input):
                         if not any(line.lower() in existing.lower() or existing.lower() in line.lower() for existing in tasks):
                             tasks.append(line)
         
-        # Testing and deployment phase
+        # Testing and deployment phase - platform specific
         tasks.append("Write comprehensive unit tests")
         tasks.append("Implement integration tests")
-        tasks.append("Perform code review and refactoring")
-        tasks.append("Set up CI/CD pipeline")
-        tasks.append("Deploy to staging environment")
-        tasks.append("Perform user acceptance testing (UAT)")
-        tasks.append("Deploy to production environment")
-        tasks.append("Set up monitoring and logging")
+        
+        if is_ios:
+            tasks.append("Test on iOS Simulator and physical devices")
+            tasks.append("Configure TestFlight for beta testing")
+            tasks.append("Submit app for App Store review")
+            tasks.append("Set up App Store analytics and crash reporting")
+        elif is_android:
+            tasks.append("Test on Android emulator and physical devices")
+            tasks.append("Set up internal testing track in Google Play Console")
+            tasks.append("Submit app for Google Play Store review")
+            tasks.append("Configure Google Play Console analytics")
+        else:
+            tasks.append("Perform code review and refactoring")
+            tasks.append("Set up CI/CD pipeline")
+            tasks.append("Deploy to staging environment")
+            tasks.append("Perform user acceptance testing (UAT)")
+            tasks.append("Deploy to production environment")
+            tasks.append("Set up monitoring and logging")
+        
         tasks.append("Create user documentation and guides")
         
         # Remove duplicates while preserving order
