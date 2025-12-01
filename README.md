@@ -14,7 +14,7 @@ tasker.ai is an intelligent, AI-powered project management and task delegation p
 *   **Downloadable Reports:** Download the final task assignments as a CSV report.
 
 ## How to Run
-1.  **Install dependencies:**
+1.  **Install dependencies (Python 3.9+):**
     ```bash
     pip install -r requirements.txt
     ```
@@ -22,7 +22,12 @@ tasker.ai is an intelligent, AI-powered project management and task delegation p
     ```bash
     streamlit run app.py
     ```
-3.  Open the app in your browser, enter your Google API key, upload an employee CSV, define a project, and generate tasks.
+3.  Open the app in your browser, upload an employee CSV, pick or define a project, generate a PRD, then generate and assign tasks.
+
+### Model downloads
+- Text generation uses the local Hugging Face model `distilgpt2`.
+- Task-to-employee matching uses `all-MiniLM-L6-v2` from SentenceTransformers.
+- On first run, these models download automatically to the Hugging Face cache (~hundreds of MB). Subsequent runs are local/offline as long as the cache persists.
 
 ## Employee CSV Format
 The employee CSV should have the following format:
