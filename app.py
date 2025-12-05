@@ -34,8 +34,8 @@ def main():
             st.sidebar.error(f"Error reading CSV: {e}")
 
     # --- Main Content ---
-    tab1, tab2, tab3 = st.tabs(
-        ["Project & PRD", "Task Generation", "Employees & Assignments"]
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["Project & PRD", "Task Generation", "Employees & Assignments", "Email Reports"]
     )
 
     # --- Project & PRD Tab ---
@@ -159,6 +159,77 @@ def main():
             st.warning("⚠️ Please upload an employee CSV file in the sidebar.")
             st.info("💡 The CSV should have columns: `name` and `skills`")
 
+    # --- Email Reports Tab (draft only, no sending) ---
+    with tab4:
+        st.header("📧 Email Reports")
+        st.markdown("---")
+
+        if "assignments_df" not in st.session_state:
+            st.info("Generate and assign tasks first to draft an email report.")
+        else:
+            assignments_df = st.session_state["assignments_df"]
+
+            st.subheader("Draft Email")
+            st.caption(f"Project: {st.session_state.get('project_name', 'Not set')}")
+
+            col_from, col_to = st.columns(2)
+            with col_from:
+                from_email = st.text_input(
+                    "From",
+                    value=st.session_state.get("email_from", "santhanakrishnan@cua.edu"),
+                    help="Sender email address",
+                )
+            with col_to:
+                to_email = st.text_input(
+                    "To",
+                    value=st.session_state.get("email_to", "aswath.mcs@gmail.com"),
+                    help="Recipient email address",
+                )
+
+            subject = st.text_input(
+                "Subject",
+                value=st.session_state.get("email_subject", "Task Assignment Report"),
+            )
+            signature = st.text_area(
+                "Signature / Company footer",
+                value=st.session_state.get(
+                    "email_signature", "Best regards,\nTasker.ai Team"
+                ),
+                height=80,
+                help="Include your company name or personal sign-off here.",
+            )
+
+            col_gen, col_preview = st.columns([1, 2])
+            with col_gen:
+                if st.button("🪄 Generate Email Draft", type="primary", use_container_width=True):
+                    email_body = generate_email_report(
+                        assignments_df,
+                        from_email,
+                        to_email,
+                        signature,
+                        st.session_state.get("project_name", "Project"),
+                        st.session_state.get("prd", ""),
+                        st.session_state.get("tasks", []),
+                    )
+                    if email_body:
+                        st.session_state["email_body"] = email_body
+                        st.session_state["email_from"] = from_email
+                        st.session_state["email_to"] = to_email
+                        st.session_state["email_subject"] = subject
+                        st.session_state["email_signature"] = signature
+                    else:
+                        st.error("Could not generate email. Please try again.")
+
+            email_body = st.text_area(
+                "Email Body",
+                value=st.session_state.get("email_body", ""),
+                height=260,
+                help="Edit the draft before sending from your email client.",
+            )
+            st.session_state["email_body"] = email_body
+
+            with st.expander("📄 Assignment summary used for the email"):
+                st.dataframe(assignments_df, use_container_width=True, hide_index=True)
 
 @st.cache_resource
 def load_text_generator():
@@ -199,19 +270,23 @@ def generate_from_model(prompt):
         generator = st.session_state["text_generator"]
         
         # Format prompt for better generation
-        formatted_prompt = prompt + "\n\n"
+        formatted_prompt = (prompt or "").strip() + "\n\n"
+        # Keep prompt within a reasonable window to avoid model length errors
+        formatted_prompt = formatted_prompt[-3500:]
         
         # Generate text
         results = generator(
             formatted_prompt,
-            max_length=len(formatted_prompt.split()) + 300,  # Generate additional tokens
+            max_new_tokens=220,
             num_return_sequences=1,
             temperature=0.7,
             do_sample=True,
             pad_token_id=generator.tokenizer.eos_token_id,
+            truncation=True,
+            return_full_text=True,
         )
         
-        generated_text = results[0]["generated_text"]
+        generated_text = results[0].get("generated_text", "")
         
         # Remove the original prompt from the generated text
         if generated_text.startswith(formatted_prompt):
@@ -229,6 +304,8 @@ def generate_prd(project_name, project_description):
         # Overview section
         overview_prompt = f"Product Requirements Document for {project_name}. Overview: {project_description}"
         overview_text = generate_from_model(overview_prompt)
+        st.session_state["project_name"] = project_name
+        st.session_state["project_description"] = project_description
         
         # Features section - extract from description
         features_prompt = f"Key features and functionalities for {project_name}: {project_description}"
@@ -642,6 +719,54 @@ def generate_tasks_from_prd(prd_input):
         
         st.session_state["tasks"] = unique_tasks
         st.success(f"✅ Generated {len(unique_tasks)} tasks successfully!")
+
+def format_assignments_summary(assignments_df):
+    """Create a concise summary of task->assignee mapping."""
+    lines = []
+    for _, row in assignments_df.iterrows():
+        task = row.get("Task", "")
+        assignee = row.get("Assigned To", "")
+        skills = row.get("Skills", "")
+        lines.append(f"- {task} -> {assignee} (Skills: {skills})")
+    return "\n".join(lines)
+
+def generate_email_report(assignments_df, from_email, to_email, signature, project_name, prd_text, tasks_list):
+    """Use the local text generator to craft a concise status email, anchored on real assignment data."""
+    summary = format_assignments_summary(assignments_df)
+    task_lines = "\n".join(f"- {t}" for t in tasks_list[:12]) if tasks_list else ""
+    prd_excerpt = (prd_text or "")[:400]
+
+    prompt = (
+        "Write a short, professional status email. Keep it concise and client-ready.\n"
+        f"Project name: {project_name}\n"
+        f"From: {from_email}\n"
+        f"To: {to_email}\n"
+        "Structure:\n"
+        "1) Greeting and one-sentence status summary about assignments being created.\n"
+        "2) Bullet list EXACTLY using the provided assignments list (do not invent or repeat). Keep them brief.\n"
+        "3) One sentence tying back to scope/context from the PRD excerpt.\n"
+        "4) Closing line that invites follow-up.\n"
+        f"Signature block (use as-is):\n{signature}\n"
+        "Assignments list (use these bullets verbatim, do not add new items):\n"
+        f"{summary}\n"
+        f"Tasks (raw list, optional to mention count):\n{task_lines}\n"
+        f"PRD excerpt:\n{prd_excerpt}\n"
+        "Return only the email body, no subject line."
+    )
+
+    generated = generate_from_model(prompt) or ""
+
+    # If the model output lacks our required bullets, fall back to a deterministic version
+    if summary not in generated:
+        deterministic = (
+            f"Hello,\n\nHere is the latest assignment update for {project_name}:\n"
+            f"{summary}\n\n"
+            f"Scope reference: {prd_excerpt[:200]}...\n\n"
+            f"Please let me know if you need any changes or additional details.\n\n{signature}"
+        )
+        return deterministic
+
+    return generated.strip()
 
 def assign_tasks(tasks, employees_df):
     with st.spinner("🤖 Matching tasks to employees based on skills..."):
