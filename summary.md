@@ -1,7 +1,7 @@
-tasker.ai Project Report
+Tasker.ai Project Report
 
 1. Introduction  
-tasker.ai is a prototype that explores whether lightweight NLP models can help with early-stage project planning. The goal is to automate three steps that are usually manual: drafting a product requirements document (PRD), turning that PRD into a structured task list, and assigning those tasks to team members based on their skills. The work was done as a course project to practice applied NLP and rapid prototyping with minimal infrastructure.
+Tasker.ai is a prototype that explores whether lightweight NLP models can help with early-stage project planning. The goal is to automate three steps that are usually manual: drafting a product requirements document (PRD), turning that PRD into a structured task list, and assigning those tasks to team members based on their skills. The work was done as a course project to practice applied NLP and rapid prototyping with minimal infrastructure.
 
 2. System Overview  
 The application is a single Streamlit app (`app.py`). It runs locally and keeps all state in Streamlit session state. The workflow is split into three tabs: (a) Project and PRD creation, (b) Task generation, and (c) Employee uploads plus task assignment. Users upload a CSV of employees with names and skill strings, describe a project, generate a PRD, generate tasks, and then assign tasks.
@@ -41,4 +41,4 @@ Run: `streamlit run app.py`, then upload `name,skills` CSV, enter a project name
 - Offer a smaller or quantized model option for slower machines, and a toggle for offline use if models are pre-fetched.
 
 9. Conclusion  
-tasker.ai shows that small, local NLP models can automate a slice of project planning: turning descriptions into structured artifacts and matching them to people. While the current prototype is intentionally simple, it provides a base to explore more rigorous task schemas, richer matching signals, and production readiness.
+Tasker.ai shows that small, local NLP models can automate a slice of project planning: turning descriptions into structured artifacts and matching them to people. While the current prototype is intentionally simple, it provides a base to explore more rigorous task schemas, richer matching signals, and production readiness.

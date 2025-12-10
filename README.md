@@ -1,9 +1,9 @@
-# tasker.ai
+# Tasker.ai
 
 ![Tasker.ai Demo](https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExZGNhYjQ0YjYxYzM5NjZkNTYyYjU3ODg2YjM4ZWMxNjQzZDRjYjBhZiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L4Z4iSCoY2v5V6e4H2/giphy.gif)
 
 ## Overview
-tasker.ai is an intelligent, AI-powered project management and task delegation platform. It uses NLP to automate project planning, task breakdown, and resource allocation.
+Tasker.ai is an intelligent, AI-powered project management and task delegation platform. It uses NLP to automate project planning, task breakdown, and resource allocation.
 
 ## Features
 *   **AI-Powered Task Generation:** Automatically generate a list of tasks from a project description.
